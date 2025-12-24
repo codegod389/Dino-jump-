@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dino Jump - Chrome Dino Game Clone</title>
+    
+    <!-- Telegram Mini App SDK - Required for proper integration -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            height: 400px;
+            border: 4px solid #222;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            background-color: #f7f7f7;
+        }
+
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #scoreDisplay {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #535353;
+            font-family: 'Courier New', monospace;
+            z-index: 10;
+            text-shadow: 2px 2px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 15px;
+            display: none;
+            z-index: 20;
+            border: 3px solid #222;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        #restartBtn {
+            margin-top: 20px;
+            padding: 12px 30px;
+            font-size: 18px;
+            background-color: #535353;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        #restartBtn:hover {
+            background-color: #333;
+            transform: scale(1.05);
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: #535353;
+            font-size: 14px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        #title {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            font-size: 32px;
+            font-weight: bold;
+            color: #e74c3c;
+            z-index: 10;
+            text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+            letter-spacing: 2px;
+        }
+
+        #highScoreDisplay {
+            position: absolute;
+            top: 50px;
+            right: 20px;
+            font-size: 16px;
+            color: #666;
+            z-index: 10;
+        }
+
+        .controls {
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-key {
+            background-color: #222;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        @keyframes titleGlow {
+            0%, 100% { 
+                color: #e74c3c;
+                text-shadow: 0 0 10px rgba(231, 76, 60, 0.5),
+                            2px 2px 0 rgba(0, 0, 0, 0.2);
+            }
+            50% { 
+                color: #c0392b;
+                text-shadow: 0 0 20px rgba(231, 76, 60, 0.8),
+                            2px 2px 0 rgba(0, 0, 0, 0.2),
+                            0 0 30px rgba(231, 76, 60, 0.6);
+            }
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes gameOverPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes jumpEffect {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <div id="title">DINO JUMP</div>
+        <div id="scoreDisplay">00000</div>
+        <div id="highScoreDisplay">HI: 00000</div>
+        <div id="instructions">SPACE/UP = JUMP • DOWN = DUCK</div>
+        
+        <div class="controls">
+            <div class="control-key">SPACE</div>
+            <div class="control-key">↑</div>
+            <div class="control-key">↓</div>
+        </div>
+        
+        <div id="gameOver">
+            <h2 style="color: #e74c3c; margin-bottom: 10px;">GAME OVER</h2>
+            <p style="font-size: 18px; margin-bottom: 5px;">Your Score: <span id="finalScore">00000</span></p>
+            <p style="font-size: 16px; color: #666;">High Score: <span id="highScore">00000</span></p>
+            <button id="restartBtn">PLAY AGAIN</button>
+            <p style="margin-top: 15px; font-size: 14px; color: #777;">Press SPACE or click RESTART</p>
+        </div>
+    </div>
+
+    <script>
+        // Telegram Mini App initialization (safe check - works both standalone and in Telegram)
+        if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.ready();    // Hides loading spinner quickly
+            window.Telegram.WebApp.expand();   // Expands to maximum available height
+            // Optional: match Telegram theme (uncomment if you want to experiment)
+            // const theme = window.Telegram.WebApp.themeParams;
+            // document.body.style.background = theme.bg_color || '#667eea';
+        }
+
+        // Game variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const highScoreDisplay = document.getElementById('highScoreDisplay');
+        const gameOverScreen = document.getElementById('gameOver');
+        const finalScore = document.getElementById('finalScore');
+        const highScoreElement = document.getElementById('highScore');
+        const restartBtn = document.getElementById('restartBtn');
+        const instructions = document.getElementById('instructions');
+        const titleElement = document.getElementById('title');
+
+        // Create image objects
+        const dinoImg = new Image();
+        const cactus1Img = new Image();
+        const cactus2Img = new Image();
+        const cactus3Img = new Image();
+        const birdImg = new Image();
+        const groundImg = new Image();
+        const moonImg = new Image();
+        const starImg = new Image();
+
+        // Set image sources
+        dinoImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDQiIGhlaWdodD0iNDciIHZpZXdCb3g9IjAgMCA0NCA0NyIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ0IiBoZWlnaHQ9IjQ3IiBmaWxsPSIjNTM1MzUzIiByeD0iNCIvPgo8cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSI4IiBoZWlnaHQ9IjEwIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSIyNiIgeT0iMTAiIHdpZHRoPSI4IiBoZWlnaHQ9IjEwIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSI1IiB5PSI0MCIgd2lkdGg9IjYiIGhlaWdodD0iMTIiIGZpbGw9IiM1MzUzNTMiIHJ4PSIyIi8+CjxyZWN0IHg9IjMzIiB5PSI0MCIgd2lkdGg9IjYiIGhlaWdodD0iMTIiIGZpbGw9IiM1MzUzNTMiIHJ4PSIyIi8+Cjwvc3ZnPgo=';
+        
+        cactus1Img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAyMCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzZhYzUwIiByeD0iNCIvPgo8cmVjdCB4PSI3IiB5PSIyIiB3aWR0aD0iNiIgaGVpZ2h0PSIyMCIgZmlsbD0iIzI2OGEzZCIgcnk9IjMiLz4KPHJlY3QgeD0iMiIgeT0iNSIgd2lkdGg9IjYiIGhlaWdodD0iMTUiIGZpbGw9IiMyNjhhM2QiIHJ5PSIzIi8+CjxyZWN0IHg9IjEyIiB5PSI4IiB3aWR0aD0iNiIgaGVpZ2h0PSIxMiIgZmlsbD0iIzI2OGEzZCIgcnk9IjMiLz4KPC9zdmc+Cg==';
+        
+        cactus2Img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzUiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAzNSA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjM1IiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzZhYzUwIiByeD0iNCIvPgo8cmVjdCB4PSI1IiB5PSIzIiB3aWR0aD0iOCIgaGVpZ2h0PSIyNSIgZmlsbD0iIzI2OGEzZCIgcnk9IjQiLz4KPHJlY3QgeD0iMTUiIHk9IjciIHdpZHRoPSI4IiBoZWlnaHQ9IjIwIiBmaWxsPSIjMjY4YTNkIiByeT0iNCIvPgo8cmVjdCB4PSIyNSIgeT0iNCIgd2lkdGg9IjgiIGhlaWdodD0iMjIiIGZpbGw9IiMyNjhhM2QiIHJ5PSI0Ii8+Cjwvc3ZnPgo=';
+        
+        cactus3Img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAyNSA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI1IiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzZhYzUwIiByeD0iNCIvPgo8cmVjdCB4PSIyIiB5PSI1IiB3aWR0aD0iNyIgaGVpZ2h0PSIyMCIgZmlsbD0iIzI2OGEzZCIgcnk9IjMiLz4KPHJlY3QgeD0iMTEiIHk9IjIiIHdpZHRoPSI3IiBoZWlnaHQ9IjIzIiBmaWxsPSIjMjY4YTNkIiByeT0iMyIvPgo8cmVjdCB4PSIyMCIgeT0iOCIgd2lkdGg9IjciIGhlaWdodD0iMTUiIGZpbGw9IiMyNjhhM2QiIHJ5PSIzIi8+Cjwvc3ZnPgo=';
+        
+        birdImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjUiIHZpZXdCb3g9IjAgMCA0MCAyNSIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIwIDJMNDAgMTIuNUwyMCAyM0wwIDEyLjVMMjAgMloiIGZpbGw9IiM1MzUzNTMiLz4KPGNpcmNsZSBjeD0iMjgiIGN5PSIxMC41IiByPSIzIiBmaWxsPSIjMzMzIi8+CjxwYXRoIGQ9Ik0zMiAxNC41TDQwIDE4IiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4K';
+        
+        groundImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwIiB2aWV3Qm94PSIwIDAgMTAwIDEwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjNTM1MzUzIi8+CjxwYXRoIGQ9Ik0wIDVIMTAiIHN0cm9rZT0iIzQyNDI0MiIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxwYXRoIGQ9Ik0yMCA1SDMwIiBzdHJva2U9IiM0MjQyNDIiIHN0cm9rZS13aWR0aD0iMiIvPgo8cGF0aCBkPSJNNDAgNUg1MCIgc3Ryb2tlPSIjNDI0MjQyIiBzdHJva2Utd2lkdGg9IjIiLz4KPHBhdGggZD0iTTYwIDVINzAiIHN0cm9rZT0iIzQyNDI0IiBzdHJva2Utd2lkdGg9IjIiLz4KPHBhdGggZD0iTTgwIDVIMTAwIiBzdHJva2U9IiM0MjQyNDIiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4K';
+        
+        moonImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAiIGhlaWdodD0iMzAiIHZpZXdCb3g9IjAgMCAzMCAzMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTUiIGN5PSIxNSIgcj0iMTIiIGZpbGw9IiNGRkZGRkUiIGZpbGwtb3BhY2l0eT0iMC45Ii8+CjxjaXJjbGUgY3g9IjIwIiBjeT0iMTAiIHI9IjMiIGZpbGw9IiNFMEUwRTAiLz4KPGNpcmNsZSBjeD0iMTIiIGN5PSIxOCIgcj0iMiIgZmlsbD0iI0UwRTBFMCIvPgo8Y2lyY2xlIGN4PSIxOCIgY3k9IjIwIiByPSIxLjUiIGZpbGw9IiNFMEUwRTAiLz4KPC9zdmc+Cg==';
+        
+        starImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOCIgaGVpZ2h0PSI4IiB2aWV3Qm94PSIwIDAgOCA4IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSI0IiBjeT0iNCIgcj0iMiIgZmlsbD0id2hpdGUiLz4KPHBhdGggZD0iTTQgMUw0LjUgMy41SDdMNSA1TDUuNSA3LjVMMTAgNUw3LjUgNS41TDggMS41TDQuNSA0WiIgZmlsbD0id2hpdGUiIG9wYWNpdHk9IjAuNSIvPgo8L3N2Zz4K';
+
+        // Game state
+        let gameSpeed = 6;
+        let score = 0;
+        let highScore = localStorage.getItem('dinoJumpHighScore') || 0;
+        let gameOver = false;
+        let gameStarted = false;
+        let frameCount = 0;
+        let isNightMode = false;
+        let dinoFrame = 0;
+        let birdFrame = 0;
+
+        // Update high score display
+        highScoreDisplay.textContent = `HI: ${String(highScore).padStart(5, '0')}`;
+        titleElement.style.animation = 'titleGlow 2s infinite';
+
+        // Dino object with animation
+        const dino = {
+            x: 50,
+            y: 170,
+            width: 44,
+            height: 47,
+            jumping: false,
+            ducking: false,
+            jumpVelocity: 0,
+            jumpForce: -15,
+            gravity: 0.8,
+            draw() {
+                // Draw dino with sprite
+                ctx.drawImage(dinoImg, this.x, this.y, this.width, this.height);
+                
+                // Add running animation effect
+                if (!this.jumping && !this.ducking) {
+                    // Draw running legs effect
+                    ctx.fillStyle = '#535353';
+                    let legOffset = Math.sin(frameCount * 0.2) * 3;
+                    
+                    // Left leg
+                    ctx.fillRect(this.x + 5, this.y + this.height, 6, 15 + legOffset);
+                    // Right leg
+                    ctx.fillRect(this.x + this.width - 11, this.y + this.height, 6, 15 - legOffset);
+                }
+                
+                // Draw eye animation
+                ctx.fillStyle = '#FFFFFF';
+                if (this.jumping) {
+                    // Excited eye when jumping
+                    ctx.fillRect(this.x + 10, this.y + 12, 8, 6);
+                    ctx.fillRect(this.x + 26, this.y + 12, 8, 6);
+                } else {
+                    // Normal eyes
+                    ctx.fillRect(this.x + 10, this.y + 10, 8, 4);
+                    ctx.fillRect(this.x + 26, this.y + 10, 8, 4);
+                }
+                
+                // Draw pupils
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(this.x + 12, this.y + (this.jumping ? 13 : 11), 4, 2);
+                ctx.fillRect(this.x + 28, this.y + (this.jumping ? 13 : 11), 4, 2);
+                
+                // Draw "DINO JUMP" text on the dino when jumping
+                if (this.jumping && this.jumpVelocity < -5) {
+                    ctx.save();
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.font = 'bold 10px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('JUMP!', this.x + this.width/2, this.y - 5);
+                    ctx.restore();
+                }
+            },
+            jump() {
+                if (!this.jumping && !this.ducking) {
+                    this.jumping = true;
+                    this.jumpVelocity = this.jumpForce;
+                    // Jump effect
+                    titleElement.style.transform = 'scale(1.1)';
+                    setTimeout(() => {
+                        titleElement.style.transform = 'scale(1)';
+                    }, 200);
+                }
+            },
+            duck(isDucking) {
+                if (!this.jumping) {
+                    this.ducking = isDucking;
+                    this.height = isDucking ? 27 : 47;
+                    this.y = isDucking ? 190 : 170;
+                }
+            },
+            update() {
+                if (this.jumping) {
+                    this.y += this.jumpVelocity;
+                    this.jumpVelocity += this.gravity;
+                    
+                    if (this.y >= 170) {
+                        this.y = 170;
+                        this.jumping = false;
+                        this.jumpVelocity = 0;
+                    }
+                }
+                
+                dinoFrame++;
+            }
+        };
+
+        // Obstacle class
+        class Obstacle {
+            constructor(type) {
+                this.x = canvas.width;
+                this.type = type;
+                this.passed = false;
+                this.frame = 0;
+                
+                if (type === 'cactus') {
+                    const cactusTypes = [cactus1Img, cactus2Img, cactus3Img];
+                    this.image = cactusTypes[Math.floor(Math.random() * cactusTypes.length)];
+                    this.width = 20 + Math.random() * 20;
+                    this.height = 40 + Math.random() * 10;
+                    this.y = 170 + (47 - this.height);
+                } else { // Bird
+                    this.image = birdImg;
+                    this.width = 40;
+                    this.height = 25;
+                    this.y = 140 + Math.random() * 60;
+                    this.wingFrame = 0;
+                }
+            }
+            
+            draw() {
+                if (this.type === 'bird') {
+                    // Animate bird wings
+                    this.wingFrame++;
+                    let wingOffset = Math.sin(this.wingFrame * 0.1) * 3;
+                    ctx.drawImage(this.image, this.x, this.y + wingOffset, this.width, this.height);
+                } else {
+                    ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+                }
+                
+                // Add shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.fillRect(this.x + 2, this.y + 2, this.width, this.height);
+            }
+            
+            update() {
+                this.x -= gameSpeed;
+                return this.x < -this.width;
+            }
+            
+            getHitbox() {
+                // Different hitboxes for different obstacles
+                if (this.type === 'bird') {
+                    return {
+                        x: this.x + 5,
+                        y: this.y + 5,
+                        width: this.width - 10,
+                        height: this.height - 10
+                    };
+                } else {
+                    return {
+                        x: this.x + 3,
+                        y: this.y + 3,
+                        width: this.width - 6,
+                        height: this.height - 6
+                    };
+                }
+            }
+        }
+
+        // Cloud class (simplified without image)
+        class Cloud {
+            constructor() {
+                this.x = canvas.width;
+                this.y = 30 + Math.random() * 70;
+                this.width = 60 + Math.random() * 40;
+                this.height = 20;
+                this.speed = 1 + Math.random() * 2;
+            }
+            
+            draw() {
+                // Draw simple cloud shapes
+                ctx.fillStyle = isNightMode ? 'rgba(240, 240, 240, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+                
+                // Draw cloud as circles
+                ctx.beginPath();
+                ctx.arc(this.x + this.width/4, this.y + this.height/2, this.height/2, 0, Math.PI * 2);
+                ctx.arc(this.x + this.width/2, this.y + this.height/2, this.height/1.5, 0, Math.PI * 2);
+                ctx.arc(this.x + this.width*3/4, this.y + this.height/2, this.height/2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            update() {
+                this.x -= this.speed;
+                return this.x < -this.width;
+            }
+        }
+
+        // Star class for night mode
+        class Star {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * 150;
+                this.size = 1 + Math.random() * 2;
+                this.twinkle = Math.random() * Math.PI * 2;
+            }
+            
+            draw() {
+                ctx.globalAlpha = 0.5 + Math.sin(this.twinkle + frameCount * 0.05) * 0.5;
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+                this.twinkle += 0.02;
+            }
+        }
+
+        // Game elements
+        let obstacles = [];
+        let clouds = [];
+        let stars = [];
+        let groundX = 0;
+
+        // Generate stars for night mode
+        for (let i = 0; i < 50; i++) {
+            stars.push(new Star());
+        }
+
+        // Draw ground with texture
+        function drawGround() {
+            // Draw ground line
+            ctx.fillStyle = isNightMode ? '#424242' : '#535353';
+            ctx.fillRect(0, 217, canvas.width, 2);
+            
+            // Draw ground pattern
+            ctx.fillStyle = isNightMode ? '#424242' : '#535353';
+            for (let i = 0; i < canvas.width / 20 + 1; i++) {
+                if ((i + Math.floor(groundX / 20)) % 2 === 0) {
+                    ctx.fillRect(i * 20 - (groundX % 20), 217, 10, 2);
+                }
+            }
+        }
+
+        // Draw background with gradient
+        function drawBackground() {
+            // Sky gradient
+            if (isNightMode) {
+                const nightGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                nightGradient.addColorStop(0, '#0a0a2a');
+                nightGradient.addColorStop(1, '#1a1a4a');
+                ctx.fillStyle = nightGradient;
+            } else {
+                const dayGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                dayGradient.addColorStop(0, '#87CEEB');
+                dayGradient.addColorStop(1, '#E0F7FF');
+                ctx.fillStyle = dayGradient;
+            }
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw moon in night mode
+            if (isNightMode) {
+                ctx.drawImage(moonImg, canvas.width - 100, 30, 30, 30);
+            }
+            
+            // Draw stars in night mode
+            if (isNightMode) {
+                stars.forEach(star => star.draw());
+            }
+            
+            // Update UI colors for night mode
+            scoreDisplay.style.color = isNightMode ? '#FFFFFF' : '#535353';
+            highScoreDisplay.style.color = isNightMode ? '#CCCCCC' : '#666666';
+            instructions.style.color = isNightMode ? '#FFFFFF' : '#535353';
+            instructions.style.backgroundColor = isNightMode ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.8)';
+            titleElement.style.color = isNightMode ? '#3498db' : '#e74c3c';
+        }
+
+        // Generate obstacles
+        function generateObstacle() {
+            if (obstacles.length === 0 || obstacles[obstacles.length - 1].x < canvas.width - 400) {
+                let type = Math.random() > 0.7 ? 'bird' : 'cactus';
+                // Don't spawn birds at low scores
+                if (score < 100) type = 'cactus';
+                // Increase bird frequency at higher scores
+                if (score > 500) type = Math.random() > 0.5 ? 'bird' : 'cactus';
+                obstacles.push(new Obstacle(type));
+            }
+        }
+
+        // Generate clouds
+        function generateCloud() {
+            if (clouds.length < 4 && Math.random() > 0.97) {
+                clouds.push(new Cloud());
+            }
+        }
+
+        // Check collision with pixel-perfect detection
+        function checkCollision(rect1, rect2) {
+            // Simple rectangle collision
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        // Update score with visual effects
+        function updateScore() {
+            frameCount++;
+            
+            if (frameCount % 5 === 0) {
+                score++;
+                scoreDisplay.textContent = String(score).padStart(5, '0');
+                
+                // Visual effect when scoring milestones
+                if (score % 100 === 0) {
+                    scoreDisplay.style.color = '#e74c3c';
+                    scoreDisplay.style.transform = 'scale(1.1)';
+                    titleElement.style.animation = 'titleGlow 0.5s infinite';
+                    setTimeout(() => {
+                        scoreDisplay.style.color = isNightMode ? '#FFFFFF' : '#535353';
+                        scoreDisplay.style.transform = 'scale(1)';
+                        titleElement.style.animation = 'titleGlow 2s infinite';
+                    }, 300);
+                }
+                
+                // Increase speed
+                if (score % 100 === 0) {
+                    gameSpeed += 0.5;
+                }
+                
+                // Toggle night mode
+                if (score % 700 === 0) {
+                    isNightMode = !isNightMode;
+                    // Visual transition effect
+                    canvas.style.filter = 'brightness(0.8)';
+                    setTimeout(() => {
+                        canvas.style.filter = 'brightness(1)';
+                    }, 500);
+                }
+            }
+        }
+
+        // Game over with effects
+        function endGame() {
+            gameOver = true;
+            gameStarted = false;
+            
+            // Update high score with Dino Jump specific key
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('dinoJumpHighScore', highScore);
+                highScoreDisplay.textContent = `HI: ${String(highScore).padStart(5, '0')}`;
+                highScoreDisplay.style.color = '#e74c3c';
+                
+                // Show "NEW HIGH SCORE!" effect
+                ctx.save();
+                ctx.fillStyle = '#e74c3c';
+                ctx.font = 'bold 24px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('NEW HIGH SCORE!', canvas.width/2, canvas.height/2 - 50);
+                ctx.restore();
+            }
+            
+            // Show game over screen with animation
+            finalScore.textContent = String(score).padStart(5, '0');
+            highScoreElement.textContent = String(highScore).padStart(5, '0');
+            gameOverScreen.style.display = 'block';
+            gameOverScreen.style.animation = 'gameOverPulse 2s infinite';
+            
+            // Game over effect
+            canvas.style.filter = 'grayscale(0.5)';
+            
+            // Stop title animation
+            titleElement.style.animation = 'none';
+        }
+
+        // Reset game
+        function resetGame() {
+            score = 0;
+            gameSpeed = 6;
+            frameCount = 0;
+            obstacles = [];
+            clouds = [];
+            gameOver = false;
+            isNightMode = false;
+            dino.y = 170;
+            dino.jumping = false;
+            dino.ducking = false;
+            dino.height = 47;
+            scoreDisplay.textContent = '00000';
+            gameOverScreen.style.display = 'none';
+            canvas.style.filter = 'none';
+            highScoreDisplay.style.color = isNightMode ? '#CCCCCC' : '#666666';
+            gameStarted = false;
+            instructions.style.display = 'block';
+            
+            // Restart title animation
+            titleElement.style.animation = 'titleGlow 2s infinite';
+            titleElement.style.transform = 'scale(1)';
+        }
+
+        // Game loop with error handling
+        function gameLoop() {
+            try {
+                // Clear and draw background
+                drawBackground();
+                
+                // Draw clouds
+                clouds = clouds.filter(cloud => {
+                    cloud.draw();
+                    return !cloud.update();
+                });
+                
+                // Draw ground
+                drawGround();
+                groundX += gameSpeed;
+                
+                // Draw dino with shadow
+                ctx.save();
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+                ctx.shadowBlur = 5;
+                ctx.shadowOffsetY = 3;
+                dino.draw();
+                ctx.restore();
+                dino.update();
+                
+                // Game logic
+                if (gameStarted && !gameOver) {
+                    generateObstacle();
+                    generateCloud();
+                    updateScore();
+                }
+                
+                // Update and draw obstacles
+                obstacles = obstacles.filter(obstacle => {
+                    obstacle.draw();
+                    
+                    // Check collision
+                    if (!gameOver && gameStarted) {
+                        const dinoHitbox = {
+                            x: dino.x + 8,
+                            y: dino.y + 8,
+                            width: dino.width - 16,
+                            height: dino.height - (dino.ducking ? 20 : 16)
+                        };
+                        
+                        if (checkCollision(dinoHitbox, obstacle.getHitbox())) {
+                            // Collision effect
+                            canvas.style.transform = 'translateX(5px)';
+                            setTimeout(() => {
+                                canvas.style.transform = 'translateX(-5px)';
+                                setTimeout(() => {
+                                    canvas.style.transform = 'translateX(0)';
+                                    endGame();
+                                }, 50);
+                            }, 50);
+                        }
+                    }
+                    
+                    return !obstacle.update();
+                });
+                
+                // Draw start screen with Dino Jump branding
+                if (!gameStarted && !gameOver) {
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.font = 'bold 28px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('DINO JUMP', canvas.width / 2, canvas.height / 2 - 20);
+                    
+                    ctx.fillStyle = isNightMode ? '#FFFFFF' : '#535353';
+                    ctx.font = 'bold 20px Courier New';
+                    ctx.fillText('PRESS SPACE TO START', canvas.width / 2, canvas.height / 2 + 20);
+                    
+                    // Animated dino on start screen
+                    ctx.save();
+                    let bounce = Math.sin(frameCount * 0.1) * 5;
+                    ctx.drawImage(dinoImg, canvas.width / 2 - 22, canvas.height / 2 + 40 + bounce, 44, 47);
+                    ctx.restore();
+                    
+                    ctx.font = '16px Courier New';
+                    ctx.fillStyle = isNightMode ? '#CCCCCC' : '#666666';
+                    ctx.fillText('Jump over cacti, duck under birds!', canvas.width / 2, canvas.height / 2 + 110);
+                    
+                    // Draw game features
+                    ctx.fillStyle = '#2ecc71';
+                    ctx.font = '14px Courier New';
+                    ctx.fillText('• Day/Night Cycle • Speed Increases • High Scores •', canvas.width / 2, canvas.height / 2 + 140);
+                }
+                
+                // Draw speed indicator
+                if (gameStarted) {
+                    ctx.fillStyle = isNightMode ? '#FFFFFF' : '#535353';
+                    ctx.font = '12px Courier New';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`SPEED: ${gameSpeed.toFixed(1)}x`, 20, 30);
+                }
+                
+                // Draw "DINO JUMP" watermark in corner during gameplay
+                if (gameStarted && !gameOver) {
+                    ctx.save();
+                    ctx.globalAlpha = 0.1;
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.font = 'bold 60px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('DINO', canvas.width / 2, canvas.height / 2);
+                    ctx.fillText('JUMP', canvas.width / 2, canvas.height / 2 + 70);
+                    ctx.restore();
+                }
+            } catch (error) {
+                console.error('Game loop error:', error);
+                // Continue game loop even if there's an error
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Input handling with visual feedback
+        document.addEventListener('keydown', (e) => {
+            if ((e.code === 'Space' || e.code === 'ArrowUp') && !gameOver) {
+                if (!gameStarted) {
+                    gameStarted = true;
+                    instructions.style.display = 'none';
+                }
+                dino.jump();
+                e.preventDefault();
+            }
+            
+            if (e.code === 'ArrowDown') {
+                dino.duck(true);
+            }
+            
+            if (e.code === 'Space' && gameOver) {
+                resetGame();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowDown') {
+                dino.duck(false);
+            }
+        });
+
+        // Button click handler
+        restartBtn.addEventListener('click', () => {
+            resetGame();
+            gameStarted = true;
+            instructions.style.display = 'none';
+        });
+
+        // Touch support for mobile
+        let touchStartY = 0;
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+            
+            if (!gameStarted && !gameOver) {
+                gameStarted = true;
+                instructions.style.display = 'none';
+            } else if (gameOver) {
+                resetGame();
+                gameStarted = true;
+            } else {
+                // Jump on tap
+                dino.jump();
+            }
+            e.preventDefault();
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            let touchY = e.touches[0].clientY;
+            if (touchY > touchStartY + 30) {
+                dino.duck(true);
+            } else if (touchY < touchStartY - 30) {
+                dino.duck(false);
+            }
+        });
+
+        // Wait for images to load before starting game
+        let imagesLoaded = 0;
+        const totalImages = 7;
+        
+        function imageLoaded() {
+            imagesLoaded++;
+            if (imagesLoaded === totalImages) {
+                // Start game loop when all images are loaded
+                gameLoop();
+            }
+        }
+        
+        dinoImg.onload = imageLoaded;
+        cactus1Img.onload = imageLoaded;
+        cactus2Img.onload = imageLoaded;
+        cactus3Img.onload = imageLoaded;
+        birdImg.onload = imageLoaded;
+        groundImg.onload = imageLoaded;
+        moonImg.onload = imageLoaded;
+        starImg.onload = imageLoaded;
+        
+        // Also handle image load errors
+        dinoImg.onerror = imageLoaded;
+        cactus1Img.onerror = imageLoaded;
+        cactus2Img.onerror = imageLoaded;
+        cactus3Img.onerror = imageLoaded;
+        birdImg.onerror = imageLoaded;
+        groundImg.onerror = imageLoaded;
+        moonImg.onerror = imageLoaded;
+        starImg.onerror = imageLoaded;
+
+    </script>
+</body>
+</html>
